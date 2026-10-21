@@ -19,7 +19,7 @@ don't duplicate it here.
   lists recipes with an API token. One recipe imported so far.
 - **Phase 1: in progress.** Built as small, separately tested blocks:
   1. ✅ Scaffold: uv project, `app/` package, env config, `/healthz`, pytest. (v0.0.1)
-  2. DB + Alembic migrations (SQLite WAL, upgrade on startup).
+  2. ✅ DB + Alembic migrations (SQLite WAL, upgrade on startup). (v0.0.2)
   3. Accounts + households + join code (every household-owned table has `household_id`).
   4. `mealie_client` (list/get recipes) against the live OpenAPI spec.
   5. Recipe sync into `recipes_cache` / `recipe_ingredients`.
@@ -74,6 +74,11 @@ uv run pytest
 # Run Chef Helper locally (auto-reloads on code changes) -> http://localhost:8000
 uv run uvicorn app.main:app --reload
 
+# Database migrations (the app also applies pending ones at startup)
+uv run alembic revision --autogenerate --rev-id 0002 -m "describe change"   # then review the file
+uv run alembic upgrade head
+uv run alembic check      # "No new upgrade operations" = models and migrations agree
+
 # Phase 0 check: list recipes via the Mealie API
 $env:MEALIE_TOKEN = "<token>"   # from Mealie: User profile -> API Tokens
 py scripts/list_mealie_recipes.py
@@ -85,7 +90,14 @@ py scripts/list_mealie_recipes.py
   the lists in `pyproject.toml` by hand. Commit `uv.lock`.
 - **Config:** `app/core/config.py` `Settings`; read via the `get_settings()`
   dependency. Dev data (SQLite DB) goes in `./data/` (git-ignored).
-- **Tests:** use `fastapi.testclient.TestClient` (backed by `httpx2`; plain
+- **Database:** models in `app/models/` (import each in `app/models/__init__.py`).
+  Every schema change needs a migration in `migrations/versions/`, numbered
+  `0001`, `0002`, ... via `--rev-id`; `tests/test_migrations.py` fails if
+  models and migrations drift. Store times with the `UTCDateTime` column type
+  (aware UTC in, aware UTC out; naive datetimes are rejected). Migrations
+  must not import from `app/` (env.py renders `UTCDateTime` as `sa.DateTime()`).
+- **Tests:** the `client` fixture (tests/conftest.py) is a started app on a
+  throwaway SQLite DB per test. Use `fastapi.testclient.TestClient` (backed by `httpx2`; plain
   `httpx` triggers a Starlette deprecation warning).
 
 - **Secrets:** config comes from environment variables only. Never commit the

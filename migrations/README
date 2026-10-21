@@ -1,0 +1,12 @@
+Alembic database migrations for Chef Helper.
+
+Each file in versions/ is one numbered change to the database structure.
+The app applies any pending ones automatically at startup.
+
+Create a new migration after changing a model in app/models/:
+    uv run alembic revision --autogenerate --rev-id 0002 -m "short description"
+Then read the generated file before committing: autogenerate is a draft.
+
+Apply / roll back by hand (uses DATABASE_URL / DATA_DIR like the app):
+    uv run alembic upgrade head
+    uv run alembic downgrade -1
