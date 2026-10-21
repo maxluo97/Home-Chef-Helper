@@ -8,7 +8,7 @@ repo root is also read, for convenience; it is git-ignored.
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import model_validator
+from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Filename of the SQLite database inside the data directory.
@@ -42,6 +42,13 @@ class Settings(BaseSettings):
     # Send the login cookie over HTTPS only. Off by default because the dev
     # server (and a plain-LAN NAS) use http; turn on behind HTTPS.
     cookie_secure: bool = False
+
+    # --- Secrets ---
+    # Installation-wide key that encrypts each household's Mealie token in
+    # the database (plan §9.8). Optional so the app still starts without it;
+    # connecting a household to Mealie then fails with a clear message.
+    # SecretStr keeps it out of logs and error pages.
+    chef_secret_key: SecretStr | None = None
 
     # --- Integrations ---
     # Base URL of the Mealie instance. Per-household API tokens live in the

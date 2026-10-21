@@ -25,6 +25,7 @@ def test_settings(tmp_path: Path) -> Settings:
         data_dir=tmp_path / "data",
         database_url="",
         mealie_url="http://mealie.test",
+        chef_secret_key="test-installation-key-" + "x" * 20,
     )
 
 

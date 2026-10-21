@@ -5,20 +5,17 @@ routes are the API and the test surface.
 """
 
 from datetime import timedelta
-from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, HTTPException, Request, Response, status
 
-from app.api.deps import SESSION_COOKIE_NAME, CurrentLoginSession, DbSession
+from app.api.deps import SESSION_COOKIE_NAME, AppSettings, CurrentLoginSession, DbSession
 from app.api.schemas import HouseholdOut, LoginRequest, MeResponse, SignupRequest, UserOut
-from app.core.config import Settings, get_settings
+from app.core.config import Settings
 from app.core.security import normalize_username
 from app.models import LoginSession, User
 from app.services import accounts
 
 router = APIRouter(prefix="/api", tags=["auth"])
-
-AppSettings = Annotated[Settings, Depends(get_settings)]
 
 
 def set_session_cookie(response: Response, session_token: str, settings: Settings) -> None:

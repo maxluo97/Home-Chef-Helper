@@ -21,14 +21,21 @@ don't duplicate it here.
   1. ✅ Scaffold: uv project, `app/` package, env config, `/healthz`, pytest. (v0.0.1)
   2. ✅ DB + Alembic migrations (SQLite WAL, upgrade on startup). (v0.0.2)
   3. ✅ Accounts + households + join code (JSON API; switcher UI comes in block 7). (v0.0.3)
-  4. `mealie_client` (list/get recipes) against the live OpenAPI spec.
+  4. ✅ `mealie_client` (list/get recipes) + per-household encrypted Mealie token. (v0.0.4)
   5. Recipe sync into `recipes_cache` / `recipe_ingredients`.
   6. Cook log + per-person ratings.
   7. Jinja + htmx UI.
   8. Mealie "last made" write-back.
   9. Dockerfile + add Chef Helper to `compose.dev.yaml`.
-- Mealie credentials are **per household**, encrypted in the DB (plan §9.8).
-  Not built yet; the token column + encryption key arrive with block 4.
+- Mealie credentials are **per household**, encrypted in the DB with the
+  installation key `CHEF_SECRET_KEY` (plan §9.8). Local `.env` holds
+  `MEALIE_TOKEN` (dev scripts + live tests) and `CHEF_SECRET_KEY`.
+- **Mealie API facts (v3.29.0, verified):** recipes are shared across a Mealie
+  *group*; `householdId` on a recipe is who added it; other households see it
+  unless "private household" is on. "Last made" is per household
+  (`GET /api/households/self/recipes/{slug}`, `PATCH /api/recipes/{slug}/last-made`).
+  `/api/users/self` gives a token's household and group. Spec saved locally:
+  fetch `http://localhost:9925/openapi.json`.
 - The NAS (HexOS) is not set up yet; everything runs on the dev PC until Phase 5.
 
 ## Versions and phases
@@ -105,6 +112,11 @@ py scripts/list_mealie_recipes.py
   by it. Logins are DB-backed sessions (`login_sessions`, cookie
   `chef_session`, only the token's SHA-256 stored); the active household is
   per session (per device).
+- **Mealie access:** go through `app/services/mealie_link.open_mealie_client`
+  (decrypts the household's token); routes get the client factory from the
+  `get_mealie_client_factory` dependency, which tests override with a fake
+  Mealie (`httpx2.MockTransport`). `tests/test_mealie_live.py` hits the real
+  dev Mealie and skips if it's down or `MEALIE_TOKEN` is missing.
 - **Tests:** the `client` fixture (tests/conftest.py) is a started app on a
   throwaway SQLite DB per test; `other_client` is a second browser (own
   cookies) on the same app, for two-user tests. Use `fastapi.testclient.TestClient` (backed by `httpx2`; plain

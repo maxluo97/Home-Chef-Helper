@@ -7,7 +7,7 @@ link table between them. Every household-owned table added later carries a
 
 from datetime import datetime
 
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, UTCDateTime, utc_now
@@ -21,6 +21,9 @@ USERNAME_MAX_LENGTH = 32
 # Join codes are stored as "XXXX-XXXX".
 JOIN_CODE_STORED_LENGTH = 9
 
+# Mealie IDs are UUIDs (36 characters); a little headroom.
+MEALIE_ID_MAX_LENGTH = 64
+
 
 class Household(Base):
     """A group of people sharing one kitchen, inventory, and Mealie household."""
@@ -32,6 +35,18 @@ class Household(Base):
     # Code others type to join; unique so it identifies one household.
     join_code: Mapped[str] = mapped_column(String(JOIN_CODE_STORED_LENGTH), unique=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now)
+
+    # --- Link to Mealie (all empty until a member connects a token) ---
+    # The household's Mealie API token, encrypted with CHEF_SECRET_KEY
+    # (app/core/crypto.py). Never stored or logged in plain text.
+    mealie_token_encrypted: Mapped[str | None] = mapped_column(Text)
+    # Who/where the token points, recorded when it was checked, so the UI can
+    # show "connected as Test (Family)" without calling Mealie.
+    mealie_username: Mapped[str | None] = mapped_column(String(NAME_MAX_LENGTH))
+    mealie_household_id: Mapped[str | None] = mapped_column(String(MEALIE_ID_MAX_LENGTH))
+    mealie_household_name: Mapped[str | None] = mapped_column(String(NAME_MAX_LENGTH))
+    mealie_group_id: Mapped[str | None] = mapped_column(String(MEALIE_ID_MAX_LENGTH))
+    mealie_connected_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 
 
 class User(Base):

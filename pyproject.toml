@@ -5,14 +5,16 @@
 
 [project]
 name = "chef-helper"
-version = "0.0.3"
+version = "0.0.4"
 description = "Household kitchen assistant: cook log, ratings, approximate inventory, and recipe suggestions alongside Mealie."
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "alembic>=1.20.0",
     "argon2-cffi>=25.1.0",
+    "cryptography>=50.0.2",
     "fastapi>=0.156.4",
+    "httpx2>=2.16.0",
     "pydantic-settings>=2.16.1",
     "sqlalchemy>=2.1.5",
     "uvicorn[standard]>=0.54.0",
@@ -25,6 +27,5 @@ testpaths = ["tests"]
 
 [dependency-groups]
 dev = [
-    "httpx2>=2.15.1",
     "pytest>=9.1.1",
 ]

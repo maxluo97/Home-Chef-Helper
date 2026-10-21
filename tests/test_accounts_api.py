@@ -149,6 +149,9 @@ def test_me_requires_login(client: TestClient) -> None:
 def test_forged_cookie_is_rejected(client: TestClient) -> None:
     """A made-up token doesn't log anyone in."""
     signup(client, "alice")
+    # Replace (not add to) the real cookie. Setting without clearing would
+    # leave the real one in the jar too, and both would be sent.
+    client.cookies.clear()
     client.cookies.set(SESSION_COOKIE_NAME, "made-up-token")
 
     assert client.get("/api/me").status_code == 401

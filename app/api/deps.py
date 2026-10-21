@@ -9,9 +9,13 @@ from typing import Annotated
 from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
+from app.core.config import Settings, get_settings
 from app.core.db import get_session
 from app.models import LoginSession
 from app.services import accounts
+
+# This app's settings (tests swap them via create_app(settings)).
+AppSettings = Annotated[Settings, Depends(get_settings)]
 
 # Name of the cookie holding the login-session token.
 SESSION_COOKIE_NAME = "chef_session"
