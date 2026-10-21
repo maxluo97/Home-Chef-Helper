@@ -363,6 +363,7 @@ These override any conflicting suggestion elsewhere in this plan.
 5. **Notifications:** **in-app only.** No ntfy / Home Assistant; drop `NTFY_URL`.
 6. **Cloud LLM:** **not allowed.** LLM use is local-only (or none).
 7. **"Want to try" recipes:** live **in the same Mealie library, tagged `want-to-try`** (option a; Mealie is the recipe manager, we don't build one). Chef Helper reads the tag during recipe sync; the `T(r)` score term applies to tagged recipes that have no cook events yet. After the first cook, Chef Helper can remove the tag via the Mealie API. **[VERIFY]** tag add/remove endpoints in Mealie's API.
+8. **Mealie credentials (decided 2026-10-20):** **one Mealie API token per Chef Helper household**, created by a user in the matching Mealie household and stored **encrypted at rest** in Chef Helper's DB. No instance-wide admin token. This keeps households isolated at the Mealie level, not only by Chef Helper's own scoping. A global `MEALIE_TOKEN` env var is for dev scripts only. **[VERIFY]** that a user-scoped token sees only its own household's recipes.
 
 Still open (minor, decide when the relevant phase starts):
 - Whether `R(r)` is weighted by who's eating tonight (§5.1).
