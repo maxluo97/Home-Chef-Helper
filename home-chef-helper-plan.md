@@ -107,7 +107,7 @@ cook_event_consumption(cook_event_id, inventory_item_id, fraction_used)
 ratings                    -- per-person, time-stamped (latest wins for scoring)
   (id, recipe_mealie_id, user_id, stars 1–5, created_at)
 
-recipe_flags               -- "want to try", "retired", "seasonal: winter"
+recipe_flags               -- "retired", "seasonal: winter" ("want to try" is a Mealie tag, see §9.7)
   (recipe_mealie_id, flag, value)
 
 checkins                   -- proactive questions
@@ -129,10 +129,24 @@ Notes:
 User flow: open the Amazon order details page → select all → copy → paste into Chef Helper → review screen → confirm.
 
 Parser pipeline:
-1. **Capture real fixtures first.** Before writing the parser, collect 3–5 real pasted orders (redact names/addresses/card digits) into `tests/fixtures/wholefoods/*.txt`. The exact page format is unknown to this plan and **must be derived from real samples** — do not guess.
-2. **Strip boilerplate:** headers, addresses, payment info, "Buy it again", "Write a product review", tip/delivery fees, totals, ads/recommendations.
-3. **Extract line items:** product title, quantity (incl. "Qty: N"), weight-based items (e.g. "1.32 lb"), price (keep for optional cost tracking).
-4. **Handle order events:** substitutions ("replaced with…"), refunded/unavailable items (exclude), split shipments.
+1. **Fixtures.** The format below was **derived from real pasted orders**; extend it only from new real samples — do not guess.
+   - **Committed fixtures are synthetic** (`tests/fixtures/wholefoods/synthetic-*.txt`): made-up orders in the exact real format, covering every case below. Golden tests run against these.
+   - **Real orders stay local** in `tests/fixtures/wholefoods/private/` (git-ignored; purchase history doesn't go to GitHub). Tests that use them must skip cleanly when the folder is empty.
+   - Observed format (Oct 2026): the paste is just the item list. It may start with an `Items in your order` header and end with a `Collapse` footer (full paste), or have neither (user-trimmed paste). Each item is a block:
+     ```
+     B07FYYBG8J-4                      ← product ID (ASIN) + "-" + position in order
+     Roma Tomato                       ← product title
+     $1.75                             ← line total actually paid
+     Qty: 0.65 lb @ $2.69/lb           ← "Qty: N @ $X each" or "Qty: W lb @ $X/lb"
+     Tare Weight: 0.01 lb              ← optional (weighed items)
+     $2.12 promotions applied          ← optional
+     ```
+   - The ASIN is stable across orders, so it is the **first lookup key** for alias mapping (before any title matching).
+   - Trust the `Qty` line over the title for units (e.g. "Zucchini Squash, 1 Each" is sold by the lb).
+2. **Strip boilerplate:** the `Items in your order` header and `Collapse` footer; tolerate (ignore) any other non-item lines.
+3. **Extract line items:** ASIN, product title, quantity (count or weight + unit), unit price, line total (keep for optional cost tracking).
+4. **Order events (substitutions, refunds):** not handled by the parser in v1. The user fixes these on the review screen or with manual entry (§4.2).
+4a. **Discard ready-to-eat store items:** Whole Foods prepared-food and bakery-counter lines are dropped entirely, not added to inventory, because they aren't cooking ingredients (and hot-bar boxes have unknown contents). Seed rules: titles starting with `PREPARED FOODS` (e.g. `PREPARED FOODS Hot Bar`) or `Pastry Single` (e.g. `Pastry Single Less Than 6, 1 Each`). Anything else the user marks "ignore" on the review screen is remembered by ASIN (see step 7).
 5. **Normalize product titles:** remove brand prefixes ("365 by Whole Foods Market", "Organic"), package sizes ("5 oz", "12 ct"), marketing words.
 6. **Map to canonical ingredient** via `ingredient_aliases` (exact → fuzzy match with rapidfuzz → optional LLM → else ask user).
 7. **Classify non-food** (paper towels, soap) → ignore list, learned over time.
@@ -141,6 +155,7 @@ Parser pipeline:
 Design so the parser is **rule-based first, LLM-assisted second**. After a few weeks of confirmed aliases, most orders should need zero LLM calls.
 
 ### 4.2 Other inputs
+- **Manual entry (required for v1):** add, edit, or remove any inventory item by hand from the inventory screen (ingredient, quantity, location, purchase date). This also covers substitutions, refunds, and anything bought outside Whole Foods.
 - **Quick add (free text):** "bought milk, a dozen eggs, 2 avocados, cilantro". Simple rule parser; LLM fallback.
 - **Generic receipt paste** (other stores): same pipeline with a generic boilerplate stripper.
 - **Later:** receipt photo (OCR → same pipeline), barcode scan (Open Food Facts lookup). Keep the parser interface pluggable: `Parser.parse(raw) -> list[ParsedLine]`.
@@ -173,7 +188,7 @@ score(r) =  w_rating   * R(r)        # household preference
 - **N (novelty):** `1 − exp(−days_since_last_cooked / τ_novelty)`. With τ ≈ 21 days, a recipe last made 3 weeks ago scores ~0.63, 2 months ago ~0.94. Never-cooked library recipes get N = 1.
 - **F (fatigue — the hysteresis):** `Σ over past cook events of exp(−Δt / τ_fatigue)`, τ ≈ 7 days. Three times in two weeks → large penalty that decays smoothly. This naturally produces "recommend favorites with decreasing frequency when repeated."
 - **A (availability):** fraction of non-staple, non-optional ingredients present (weighted by confidence). Missing ingredients become a "you'd need: …" list.
-- **T (try):** boost for recipes flagged "want to try" so the library grows.
+- **T (try):** boost for recipes tagged `want-to-try` in Mealie that haven't been cooked yet, so the library grows.
 
 **Selection:** don't always return the argmax — sample the top suggestions with a softmax at temperature `T` so suggestions don't get stale. Expose `T` and all weights in a settings screen and in config.
 
@@ -338,14 +353,20 @@ Receipt photo OCR, barcode scanning, meal planning for the week (write plan into
 
 ---
 
-## 9. Open questions for the owner **[DECIDE]**
-1. NAS hardware: CPU model, RAM, GPU (determines LLM feasibility and model size).
-2. How many household users? Should ratings be per-person (recommended) or one shared rating?
-3. Frontend preference: htmx (simpler, Python-only) vs. React SPA.
-4. Auth: shared household login + user picker, or individual logins (possibly reusing Mealie accounts)?
-5. Notifications: ntfy, Home Assistant (already on HexOS?), or in-app only?
-6. Is sending grocery item names to a cloud LLM acceptable as an opt-in fallback?
-7. Should "want to try" recipes (not yet cooked) live in the same Mealie library, tagged, or separately?
+## 9. Owner decisions (answered 2026-10-20)
+These override any conflicting suggestion elsewhere in this plan.
+
+1. **NAS hardware:** Ryzen 5 4500 (6C/12T, no iGPU), 32 GB DDR4-3200 (2×16, CL16), Intel Arc A380 6 GB. → CPU-only MoE (e.g. Qwen3 30B-A3B) is feasible; the A380 can run ~4–8B quantized models. **[VERIFY]** Ollama's Intel Arc support (IPEX-LLM / Vulkan) at Phase 6. NAS is not yet set up; develop locally until Phase 5.
+2. **Users:** up to ~10. Ratings are **per-person**.
+3. **Frontend:** **server-rendered Jinja + htmx**, installable as a PWA.
+4. **Auth:** **individual accounts in Chef Helper**, plus a **household join code** to join an existing household. **Multiple households per instance must be supported**: every household-owned table carries `household_id`, and all queries are scoped by it. Each household maps to its own Mealie household. **[VERIFY]** Mealie's household/group API when building this.
+5. **Notifications:** **in-app only.** No ntfy / Home Assistant; drop `NTFY_URL`.
+6. **Cloud LLM:** **not allowed.** LLM use is local-only (or none).
+7. **"Want to try" recipes:** live **in the same Mealie library, tagged `want-to-try`** (option a; Mealie is the recipe manager, we don't build one). Chef Helper reads the tag during recipe sync; the `T(r)` score term applies to tagged recipes that have no cook events yet. After the first cook, Chef Helper can remove the tag via the Mealie API. **[VERIFY]** tag add/remove endpoints in Mealie's API.
+
+Still open (minor, decide when the relevant phase starts):
+- Whether `R(r)` is weighted by who's eating tonight (§5.1).
+- How check-in questions rotate between household members (§5.3).
 
 ---
 
