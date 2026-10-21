@@ -12,7 +12,8 @@ from app.models import Base
 
 # Every table the migrations should create (besides Alembic's own bookkeeping).
 EXPECTED_TABLES = {
-    "households", "household_memberships", "login_sessions", "recipe_ingredients", "recipes", "users",
+    "cook_events", "households", "household_memberships", "login_sessions", "ratings",
+    "recipe_ingredients", "recipes", "users",
 }
 
 

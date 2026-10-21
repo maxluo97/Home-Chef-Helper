@@ -3,7 +3,7 @@
 from fastapi import APIRouter, HTTPException, status
 
 from app.api.deps import CurrentLoginSession, DbSession
-from app.api.schemas import CreateHouseholdRequest, HouseholdOut, JoinHouseholdRequest
+from app.api.schemas import CreateHouseholdRequest, HouseholdOut, JoinHouseholdRequest, UserOut
 from app.services import accounts
 
 router = APIRouter(prefix="/api/households", tags=["households"])
@@ -18,6 +18,14 @@ def list_my_households(login_session: CurrentLoginSession, db: DbSession) -> lis
     """Households the logged-in user belongs to."""
     households = accounts.list_households(db, login_session.user_id)
     return [HouseholdOut.model_validate(household) for household in households]
+
+
+@router.get("/{household_id}/members")
+def list_household_members(household_id: int, login_session: CurrentLoginSession, db: DbSession) -> list[UserOut]:
+    """People in a household you belong to (e.g. to pick who cooked)."""
+    if not accounts.is_member(db, login_session.user_id, household_id):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, NOT_A_MEMBER_MESSAGE)
+    return [UserOut.model_validate(member) for member in accounts.list_members(db, household_id)]
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)

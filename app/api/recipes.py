@@ -11,11 +11,12 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from app.api.deps import ActiveHouseholdId, AppSettings, DbSession
+from app.api.deps import ActiveHouseholdId, AppSettings, CurrentLoginSession, DbSession
 from app.api.mealie import MealieClientFactoryDep, mealie_errors_as_http
 from app.domain.ingredients import is_want_to_try
 from app.models import Household, Recipe
 from app.services import mealie_link
+from app.services.cook_log import RecipeCookStats, household_recipe_stats
 from app.services.recipe_sync import sync_household_recipes
 
 router = APIRouter(prefix="/api/recipes", tags=["recipes"])
@@ -36,7 +37,7 @@ class RecipeSyncOut(BaseModel):
 
 
 class RecipeOut(BaseModel):
-    """A recipe in the library list."""
+    """A recipe in the library list, with the household's history of it."""
 
     id: int
     slug: str
@@ -45,10 +46,17 @@ class RecipeOut(BaseModel):
     want_to_try: bool
     ingredient_count: int
     removed_at: datetime | None
+    # --- From the cook log and ratings ---
+    cook_count: int
+    last_cooked_at: datetime | None
+    average_stars: float | None  # mean of each member's latest rating
+    my_stars: int | None  # the caller's latest rating
 
     @classmethod
-    def from_recipe(cls, recipe: Recipe) -> "RecipeOut":
-        """Build from a cached recipe (ingredients must be loaded)."""
+    def from_recipe(cls, recipe: Recipe, stats: RecipeCookStats | None, user_id: int) -> "RecipeOut":
+        """Build from a cached recipe (ingredients loaded) and its stats."""
+        stats = stats or RecipeCookStats()
+        my_latest = stats.latest_ratings.get(user_id)
         return cls(
             id=recipe.id,
             slug=recipe.slug,
@@ -57,6 +65,10 @@ class RecipeOut(BaseModel):
             want_to_try=is_want_to_try(recipe.tags),
             ingredient_count=len(recipe.ingredients),
             removed_at=recipe.removed_at,
+            cook_count=stats.cook_count,
+            last_cooked_at=stats.last_cooked_at,
+            average_stars=stats.average_stars,
+            my_stars=my_latest.stars if my_latest else None,
         )
 
 
@@ -108,7 +120,12 @@ def sync_recipes(
 
 
 @router.get("")
-def list_recipes(household_id: ActiveHouseholdId, db: DbSession, include_removed: bool = False) -> RecipeListOut:
+def list_recipes(
+    household_id: ActiveHouseholdId,
+    login_session: CurrentLoginSession,
+    db: DbSession,
+    include_removed: bool = False,
+) -> RecipeListOut:
     """The active household's cached recipes, by name.
 
     Recipes deleted from Mealie are hidden unless `?include_removed=true`.
@@ -122,14 +139,20 @@ def list_recipes(household_id: ActiveHouseholdId, db: DbSession, include_removed
     if not include_removed:
         query = query.where(Recipe.removed_at.is_(None))
 
+    stats_by_recipe = household_recipe_stats(db, household_id)
     return RecipeListOut(
         synced_at=db.get(Household, household_id).recipes_synced_at,
-        recipes=[RecipeOut.from_recipe(recipe) for recipe in db.scalars(query)],
+        recipes=[
+            RecipeOut.from_recipe(recipe, stats_by_recipe.get(recipe.id), login_session.user_id)
+            for recipe in db.scalars(query)
+        ],
     )
 
 
 @router.get("/{recipe_id}")
-def get_recipe(recipe_id: int, household_id: ActiveHouseholdId, db: DbSession) -> RecipeDetailOut:
+def get_recipe(
+    recipe_id: int, household_id: ActiveHouseholdId, login_session: CurrentLoginSession, db: DbSession
+) -> RecipeDetailOut:
     """One cached recipe with its ingredients.
 
     404 if it doesn't exist *or* belongs to another household (scoped by
@@ -141,8 +164,9 @@ def get_recipe(recipe_id: int, household_id: ActiveHouseholdId, db: DbSession) -
     if recipe is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Recipe not found.")
 
+    stats = household_recipe_stats(db, household_id).get(recipe.id)
     return RecipeDetailOut(
-        **RecipeOut.from_recipe(recipe).model_dump(),
+        **RecipeOut.from_recipe(recipe, stats, login_session.user_id).model_dump(),
         ingredients=[
             RecipeIngredientOut(
                 position=line.position,

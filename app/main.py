@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.api import auth, health, households, mealie, recipes
+from app.api import auth, cooking, health, households, mealie, recipes
 from app.core.config import Settings, get_settings
 from app.core.db import make_engine, make_session_factory
 from app.core.migrate import upgrade_to_head
@@ -51,6 +51,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.include_router(households.router)
     application.include_router(mealie.router)
     application.include_router(recipes.router)
+    application.include_router(cooking.router)
 
     return application
 

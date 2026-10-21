@@ -163,6 +163,18 @@ def list_households(db: Session, user_id: int) -> list[Household]:
     )
 
 
+def list_members(db: Session, household_id: int) -> list[User]:
+    """People in the household, in the order they joined."""
+    return list(
+        db.scalars(
+            select(User)
+            .join(HouseholdMembership, HouseholdMembership.user_id == User.id)
+            .where(HouseholdMembership.household_id == household_id)
+            .order_by(HouseholdMembership.joined_at, User.id)
+        )
+    )
+
+
 def unused_join_code(db: Session) -> str:
     """Draw random join codes until one isn't taken by another household."""
     for _iAttempt in range(JOIN_CODE_MAX_ATTEMPTS):

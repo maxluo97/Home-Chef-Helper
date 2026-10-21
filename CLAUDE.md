@@ -24,7 +24,7 @@ don't duplicate it here.
   4. ✅ `mealie_client` (list/get recipes) + per-household encrypted Mealie token. (v0.0.4)
   5. ✅ Recipe sync (on demand) into `recipes` / `recipe_ingredients`. (v0.0.5)
      Nightly scheduled sync still to add (APScheduler; planned alongside block 9).
-  6. Cook log + per-person ratings.
+  6. ✅ Cook log + per-person ratings (whole stars, latest wins, history kept). (v0.0.6)
   7. Jinja + htmx UI.
   8. Mealie "last made" write-back.
   9. Dockerfile + add Chef Helper to `compose.dev.yaml`.
@@ -129,6 +129,11 @@ py scripts/list_mealie_recipes.py
   (`app/domain/ingredients.py`); Phase 2's `ingredients` table will link to
   that name. Whether canonical ingredients are global or per household is
   still open; decide at Phase 2.
+- **Cook log / ratings:** `app/services/cook_log.py` (every function takes the
+  household and filters by it; other households' IDs act as not found).
+  Ratings are append-only; "latest per person wins" lives in
+  `app/domain/ratings.py`. API datetimes must carry a timezone
+  (`AwareDatetime`); naive ones get 422.
 - **Fake Mealie for tests:** `tests/fake_mealie.py` (`FakeMealie`): add/edit/
   delete recipes, small pages, and `fail_after_requests` to simulate outages.
 - **Tests:** the `client` fixture (tests/conftest.py) is a started app on a
