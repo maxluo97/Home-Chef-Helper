@@ -45,12 +45,17 @@ The global versioning rules apply (tags down to `vX.Y.Z`; `version` in
 
 | Version | Milestone |
 |---|---|
-| `v0.0.x` | Phase 0 + Phase 1 blocks, on the way to the first usable version. Block 1 (plus the Phase 0 setup) = `v0.0.1`. |
+| `v0.0.x` | Phase 0 + Phase 1 blocks, on the way to the first usable version. Block 1 (plus the Phase 0 setup) = `v0.0.1`. **Not tagged** (see below). |
 | `v0.1` | Phase 1 acceptance criteria pass (cook log, ratings, Mealie write-back). |
 | `v0.2` / `v0.3` / `v0.4` | Phases 2 / 3 / 4 pass (inventory + Whole Foods paste / recommendations / check-ins). |
 | `v1.0` | Phase 5: first production release, running on the NAS. |
 | `v1.1`+ | Phase 6 (optional LLM layer), then "later ideas." |
 
+- **No git tags before `v0.1.0`** (owner decision, 2026-10-21; overrides the
+  global "tag every three-place version" rule for `v0.0.x` only). `v0.0.x`
+  versions still bump `version` in `pyproject.toml` and are named in commit
+  messages. The `v0.1.0` tag message summarizes all `v0.0.x` work (build it
+  from the block commit messages). Tagging resumes normally from `v0.1.0`.
 - Within a phase, a finished block (or a group of small blocks) bumps the third
   place: e.g. Phase 2 blocks are `v0.1.1`, `v0.1.2`, ... until `v0.2`.
 - The mapping isn't strictly 1-to-1. If a phase is big enough to deserve two
