@@ -360,6 +360,7 @@ These override any conflicting suggestion elsewhere in this plan.
 2. **Users:** up to ~10. Ratings are **per-person**.
 3. **Frontend:** **server-rendered Jinja + htmx**, installable as a PWA.
 4. **Auth:** **individual accounts in Chef Helper**, plus a **household join code** to join an existing household. **Multiple households per instance must be supported**: every household-owned table carries `household_id`, and all queries are scoped by it. Each household maps to its own Mealie household. **[VERIFY]** Mealie's household/group API when building this.
+   - *Details (decided 2026-10-21):* log in with **username + password** (no email; the app never sends mail). A person can belong to **several households** and switch between them; the active household is per login session. **Anyone who can reach the app** may sign up and create a household (it is LAN/Tailscale-only); joining an existing household requires its join code, which any member can regenerate.
 5. **Notifications:** **in-app only.** No ntfy / Home Assistant; drop `NTFY_URL`.
 6. **Cloud LLM:** **not allowed.** LLM use is local-only (or none).
 7. **"Want to try" recipes:** live **in the same Mealie library, tagged `want-to-try`** (option a; Mealie is the recipe manager, we don't build one). Chef Helper reads the tag during recipe sync; the `T(r)` score term applies to tagged recipes that have no cook events yet. After the first cook, Chef Helper can remove the tag via the Mealie API. **[VERIFY]** tag add/remove endpoints in Mealie's API.

@@ -1,19 +1,25 @@
-"""Households and users: the two tables everything else hangs off.
+"""Households, users, and who belongs to which household.
 
-Deliberately minimal for now. Login fields, household membership, the join
-code, and the encrypted Mealie token (plan §9.4, §9.8) arrive with the
-accounts block, as a new migration.
+A user can belong to several households (plan §9.4); membership is the
+link table between them. Every household-owned table added later carries a
+`household_id`, and queries are scoped to the user's active household.
 """
 
 from datetime import datetime
 
-from sqlalchemy import String
+from sqlalchemy import ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, UTCDateTime, utc_now
 
 # Maximum length for display names (households and people).
 NAME_MAX_LENGTH = 100
+
+# Stored usernames are 3-32 chars (see app/core/security.py).
+USERNAME_MAX_LENGTH = 32
+
+# Join codes are stored as "XXXX-XXXX".
+JOIN_CODE_STORED_LENGTH = 9
 
 
 class Household(Base):
@@ -23,6 +29,8 @@ class Household(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(NAME_MAX_LENGTH))
+    # Code others type to join; unique so it identifies one household.
+    join_code: Mapped[str] = mapped_column(String(JOIN_CODE_STORED_LENGTH), unique=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now)
 
 
@@ -32,5 +40,25 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(NAME_MAX_LENGTH))
+    # Login name, stored lower-case so it's case-insensitive.
+    username: Mapped[str] = mapped_column(String(USERNAME_MAX_LENGTH), unique=True)
+    # Argon2 hash; the password itself is never stored.
+    password_hash: Mapped[str] = mapped_column(String(255))
+    # Friendly name shown in the UI ("Max"), free-form.
+    display_name: Mapped[str] = mapped_column(String(NAME_MAX_LENGTH))
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now)
+
+
+class HouseholdMembership(Base):
+    """Links one user to one household. A user may have several rows."""
+
+    __tablename__ = "household_memberships"
+
+    # The pair is the primary key, so a user can't join the same household twice.
+    household_id: Mapped[int] = mapped_column(
+        ForeignKey("households.id", ondelete="CASCADE"), primary_key=True
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, index=True
+    )
+    joined_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now)

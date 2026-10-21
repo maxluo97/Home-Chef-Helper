@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.api import health
+from app.api import auth, health, households
 from app.core.config import Settings, get_settings
 from app.core.db import make_engine, make_session_factory
 from app.core.migrate import upgrade_to_head
@@ -47,6 +47,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     # --- Routers ---
     application.include_router(health.router)
+    application.include_router(auth.router)
+    application.include_router(households.router)
 
     return application
 

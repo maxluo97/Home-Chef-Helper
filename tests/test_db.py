@@ -10,6 +10,7 @@ from sqlalchemy.exc import StatementError
 
 from app.core.db import SQLITE_BUSY_TIMEOUT_MS, make_engine, make_session_factory
 from app.core.migrate import upgrade_to_head
+from app.core.security import generate_join_code
 from app.models import Household
 
 
@@ -83,7 +84,7 @@ def test_datetimes_round_trip_as_utc(migrated_engine: Engine) -> None:
 
     # Save with one session...
     with session_factory() as session:
-        household = Household(name="Test kitchen", created_at=created_in_eastern)
+        household = Household(name="Test kitchen", join_code=generate_join_code(), created_at=created_in_eastern)
         session.add(household)
         session.commit()
         household_id = household.id
@@ -102,7 +103,7 @@ def test_created_at_defaults_to_now(migrated_engine: Engine) -> None:
     before_insert = datetime.now(UTC)
 
     with session_factory() as session:
-        household = Household(name="Test kitchen")
+        household = Household(name="Test kitchen", join_code=generate_join_code())
         session.add(household)
         session.commit()
 
@@ -114,6 +115,7 @@ def test_naive_datetime_is_rejected(migrated_engine: Engine) -> None:
     session_factory = make_session_factory(migrated_engine)
 
     with session_factory() as session:
-        session.add(Household(name="Test kitchen", created_at=datetime(2026, 10, 21, 18, 30)))
+        naive_time = datetime(2026, 10, 21, 18, 30)
+        session.add(Household(name="Test kitchen", join_code=generate_join_code(), created_at=naive_time))
         with pytest.raises(StatementError, match="Naive datetime"):
             session.commit()

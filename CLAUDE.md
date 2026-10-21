@@ -20,7 +20,7 @@ don't duplicate it here.
 - **Phase 1: in progress.** Built as small, separately tested blocks:
   1. ✅ Scaffold: uv project, `app/` package, env config, `/healthz`, pytest. (v0.0.1)
   2. ✅ DB + Alembic migrations (SQLite WAL, upgrade on startup). (v0.0.2)
-  3. Accounts + households + join code (every household-owned table has `household_id`).
+  3. ✅ Accounts + households + join code (JSON API; switcher UI comes in block 7). (v0.0.3)
   4. `mealie_client` (list/get recipes) against the live OpenAPI spec.
   5. Recipe sync into `recipes_cache` / `recipe_ingredients`.
   6. Cook log + per-person ratings.
@@ -28,6 +28,7 @@ don't duplicate it here.
   8. Mealie "last made" write-back.
   9. Dockerfile + add Chef Helper to `compose.dev.yaml`.
 - Mealie credentials are **per household**, encrypted in the DB (plan §9.8).
+  Not built yet; the token column + encryption key arrive with block 4.
 - The NAS (HexOS) is not set up yet; everything runs on the dev PC until Phase 5.
 
 ## Versions and phases
@@ -96,8 +97,17 @@ py scripts/list_mealie_recipes.py
   models and migrations drift. Store times with the `UTCDateTime` column type
   (aware UTC in, aware UTC out; naive datetimes are rejected). Migrations
   must not import from `app/` (env.py renders `UTCDateTime` as `sa.DateTime()`).
+- **Layers:** routes in `app/api/` stay thin; logic that touches the DB lives
+  in `app/services/` (shared by the JSON API and, later, HTML pages); pure
+  logic lives in `app/core/security.py` now and `app/domain/` later.
+- **Household scoping:** any route on household-owned data takes the
+  `ActiveHouseholdId` dependency (`app/api/deps.py`) and filters every query
+  by it. Logins are DB-backed sessions (`login_sessions`, cookie
+  `chef_session`, only the token's SHA-256 stored); the active household is
+  per session (per device).
 - **Tests:** the `client` fixture (tests/conftest.py) is a started app on a
-  throwaway SQLite DB per test. Use `fastapi.testclient.TestClient` (backed by `httpx2`; plain
+  throwaway SQLite DB per test; `other_client` is a second browser (own
+  cookies) on the same app, for two-user tests. Use `fastapi.testclient.TestClient` (backed by `httpx2`; plain
   `httpx` triggers a Starlette deprecation warning).
 
 - **Secrets:** config comes from environment variables only. Never commit the

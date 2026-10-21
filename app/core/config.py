@@ -35,6 +35,14 @@ class Settings(BaseSettings):
     # switching to Postgres later is just setting this variable.
     database_url: str = ""
 
+    # --- Login sessions ---
+    # How long a login lasts before asking for the password again. Long,
+    # because the app is mostly used on personal phones in the kitchen.
+    session_lifetime_days: int = 90
+    # Send the login cookie over HTTPS only. Off by default because the dev
+    # server (and a plain-LAN NAS) use http; turn on behind HTTPS.
+    cookie_secure: bool = False
+
     # --- Integrations ---
     # Base URL of the Mealie instance. Per-household API tokens live in the
     # database (plan §9.8), not here.
