@@ -22,7 +22,8 @@ don't duplicate it here.
   2. ✅ DB + Alembic migrations (SQLite WAL, upgrade on startup). (v0.0.2)
   3. ✅ Accounts + households + join code (JSON API; switcher UI comes in block 7). (v0.0.3)
   4. ✅ `mealie_client` (list/get recipes) + per-household encrypted Mealie token. (v0.0.4)
-  5. Recipe sync into `recipes_cache` / `recipe_ingredients`.
+  5. ✅ Recipe sync (on demand) into `recipes` / `recipe_ingredients`. (v0.0.5)
+     Nightly scheduled sync still to add (APScheduler; planned alongside block 9).
   6. Cook log + per-person ratings.
   7. Jinja + htmx UI.
   8. Mealie "last made" write-back.
@@ -122,6 +123,14 @@ py scripts/list_mealie_recipes.py
   `get_mealie_client_factory` dependency, which tests override with a fake
   Mealie (`httpx2.MockTransport`). `tests/test_mealie_live.py` hits the real
   dev Mealie and skips if it's down or `MEALIE_TOKEN` is missing.
+- **Recipe cache:** `recipes` is per household (plan's `recipes_cache`); a
+  recipe gone from Mealie gets `removed_at`, never deleted (cook logs point
+  at it). Ingredient lines store Mealie's food plus `canonical_name`
+  (`app/domain/ingredients.py`); Phase 2's `ingredients` table will link to
+  that name. Whether canonical ingredients are global or per household is
+  still open; decide at Phase 2.
+- **Fake Mealie for tests:** `tests/fake_mealie.py` (`FakeMealie`): add/edit/
+  delete recipes, small pages, and `fail_after_requests` to simulate outages.
 - **Tests:** the `client` fixture (tests/conftest.py) is a started app on a
   throwaway SQLite DB per test; `other_client` is a second browser (own
   cookies) on the same app, for two-user tests. Use `fastapi.testclient.TestClient` (backed by `httpx2`; plain

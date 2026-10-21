@@ -83,7 +83,9 @@ class MealieRecipeSummary(MealieModel):
     name: str | None = None
     household_id: str
     tags: list[MealieTag] = []
-    date_updated: str | None = None
+    # Changes on every edit (microsecond precision); recipe sync compares it
+    # to skip re-downloading unchanged recipes. Kept as Mealie's raw text.
+    updated_at: str | None = None
 
     @field_validator("tags", mode="before")
     @classmethod
@@ -118,6 +120,9 @@ class MealieIngredient(MealieModel):
     display: str = ""  # Mealie's ready-made text, e.g. "2 cups spinach"
     original_text: str | None = None  # the line as originally imported
     reference_id: str | None = None
+    # Section heading that starts at this line (e.g. "For the sauce"); Mealie
+    # sends "" when there is none.
+    title: str | None = None
 
 
 class MealieRecipe(MealieRecipeSummary):

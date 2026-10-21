@@ -5,6 +5,8 @@ a connection. The app's real recipe screens will read the local cache that
 recipe sync (block 5) fills.
 """
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import datetime
 from typing import Annotated
 
@@ -127,17 +129,16 @@ def disconnect_mealie(household_id: int, login_session: CurrentLoginSession, db:
 # --- Live recipe list for the active household ---
 
 
-@router.get("/api/mealie/recipes")
-def list_live_mealie_recipes(
-    household_id: ActiveHouseholdId,
-    db: DbSession,
-    settings: AppSettings,
-    make_client: MealieClientFactoryDep,
-) -> list[MealieRecipeOut]:
-    """Recipes Mealie shows the active household, fetched live."""
+@contextmanager
+def mealie_errors_as_http() -> Iterator[None]:
+    """Turn problems using a household's Mealie link into HTTP errors.
+
+    Wrap any block that opens and uses the household's Mealie client:
+        with mealie_errors_as_http():
+            with mealie_link.open_mealie_client(...) as mealie: ...
+    """
     try:
-        with mealie_link.open_mealie_client(db, settings, make_client, household_id) as mealie:
-            recipes = mealie.list_recipe_summaries()
+        yield
     except mealie_link.MealieNotConfiguredError:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, NOT_CONFIGURED_MESSAGE) from None
     except mealie_link.MealieNotConnectedError as not_connected:
@@ -148,6 +149,19 @@ def list_live_mealie_recipes(
         ) from None
     except MealieUnavailableError:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, MEALIE_DOWN_MESSAGE) from None
+
+
+@router.get("/api/mealie/recipes")
+def list_live_mealie_recipes(
+    household_id: ActiveHouseholdId,
+    db: DbSession,
+    settings: AppSettings,
+    make_client: MealieClientFactoryDep,
+) -> list[MealieRecipeOut]:
+    """Recipes Mealie shows the active household, fetched live."""
+    with mealie_errors_as_http():
+        with mealie_link.open_mealie_client(db, settings, make_client, household_id) as mealie:
+            recipes = mealie.list_recipe_summaries()
 
     return [
         MealieRecipeOut(slug=recipe.slug, name=recipe.name, tags=[tag.slug for tag in recipe.tags])

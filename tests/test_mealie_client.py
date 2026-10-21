@@ -44,7 +44,7 @@ def recipe_summary_body(slug: str, tags: list[dict] | None = None) -> dict:
         "groupId": "group-1",
         "userId": "user-1",
         "tags": tags,
-        "dateUpdated": "2026-10-20T12:00:00",
+        "updatedAt": "2026-10-20T12:00:00.000001+00:00",
         "recipeServings": 4,  # extra field: must be ignored
     }
 

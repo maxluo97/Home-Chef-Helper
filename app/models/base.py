@@ -12,7 +12,9 @@ from sqlalchemy.types import TypeDecorator
 # on SQLite where altering a table means rebuilding it.
 NAMING_CONVENTION = {
     "ix": "ix_%(column_0_label)s",
-    "uq": "uq_%(table_name)s_%(column_0_name)s",
+    # column_0_N_name joins every column, so multi-column rules get full names
+    # ("uq_recipes_household_id_mealie_recipe_id").
+    "uq": "uq_%(table_name)s_%(column_0_N_name)s",
     "ck": "ck_%(table_name)s_%(constraint_name)s",
     "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
     "pk": "pk_%(table_name)s",

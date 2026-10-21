@@ -11,7 +11,9 @@ from app.core.migrate import downgrade_to, upgrade_to_head
 from app.models import Base
 
 # Every table the migrations should create (besides Alembic's own bookkeeping).
-EXPECTED_TABLES = {"households", "household_memberships", "login_sessions", "users"}
+EXPECTED_TABLES = {
+    "households", "household_memberships", "login_sessions", "recipe_ingredients", "recipes", "users",
+}
 
 
 def sqlite_url(tmp_path: Path) -> str:

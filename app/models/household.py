@@ -47,6 +47,8 @@ class Household(Base):
     mealie_household_name: Mapped[str | None] = mapped_column(String(NAME_MAX_LENGTH))
     mealie_group_id: Mapped[str | None] = mapped_column(String(MEALIE_ID_MAX_LENGTH))
     mealie_connected_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    # When recipe sync last finished successfully (None = never).
+    recipes_synced_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 
 
 class User(Base):
