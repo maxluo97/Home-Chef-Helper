@@ -1,0 +1,27 @@
+# Project metadata and dependencies for Chef Helper.
+# Managed with uv: add packages with `uv add <name>` (or `uv add --dev <name>`
+# for test-only tools) rather than editing the lists by hand; uv pins exact
+# versions in uv.lock.
+
+[project]
+name = "chef-helper"
+version = "0.1.0"
+description = "Household kitchen assistant: cook log, ratings, approximate inventory, and recipe suggestions alongside Mealie."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.156.4",
+    "pydantic-settings>=2.16.1",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[tool.pytest.ini_options]
+# Tests import the app as `app.*` from the repo root.
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "httpx2>=2.15.1",
+    "pytest>=9.1.1",
+]

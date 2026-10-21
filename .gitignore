@@ -5,6 +5,9 @@ tests/fixtures/wholefoods/private/
 .env
 .env.*
 
+# Local app data (SQLite DB, uploads, backups) from dev runs
+data/
+
 # Python
 __pycache__/
 *.py[cod]

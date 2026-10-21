@@ -17,9 +17,17 @@ don't duplicate it here.
 
 - **Phase 0: done.** Local Mealie runs in Docker; `scripts/list_mealie_recipes.py`
   lists recipes with an API token. One recipe imported so far.
-- **Next: Phase 1** (FastAPI skeleton, DB + migrations, `/healthz`, Mealie sync,
-  cook log, per-person ratings, accounts + household join code). Build it in
-  small, separately tested blocks.
+- **Phase 1: in progress.** Built as small, separately tested blocks:
+  1. ✅ Scaffold: uv project, `app/` package, env config, `/healthz`, pytest.
+  2. DB + Alembic migrations (SQLite WAL, upgrade on startup).
+  3. Accounts + households + join code (every household-owned table has `household_id`).
+  4. `mealie_client` (list/get recipes) against the live OpenAPI spec.
+  5. Recipe sync into `recipes_cache` / `recipe_ingredients`.
+  6. Cook log + per-person ratings.
+  7. Jinja + htmx UI.
+  8. Mealie "last made" write-back.
+  9. Dockerfile + add Chef Helper to `compose.dev.yaml`.
+- Mealie credentials are **per household**, encrypted in the DB (plan §9.8).
 - The NAS (HexOS) is not set up yet; everything runs on the dev PC until Phase 5.
 
 ## Dev environment
@@ -38,12 +46,28 @@ don't duplicate it here.
 docker compose -f deploy/compose.dev.yaml up -d
 docker compose -f deploy/compose.dev.yaml down
 
+# Install / update dependencies into .venv (after a pull or pyproject change)
+uv sync
+
+# Run the tests
+uv run pytest
+
+# Run Chef Helper locally (auto-reloads on code changes) -> http://localhost:8000
+uv run uvicorn app.main:app --reload
+
 # Phase 0 check: list recipes via the Mealie API
 $env:MEALIE_TOKEN = "<token>"   # from Mealie: User profile -> API Tokens
 py scripts/list_mealie_recipes.py
 ```
 
 ## Conventions and gotchas
+
+- **Dependencies:** add with `uv add <pkg>` / `uv add --dev <pkg>`; never edit
+  the lists in `pyproject.toml` by hand. Commit `uv.lock`.
+- **Config:** `app/core/config.py` `Settings`; read via the `get_settings()`
+  dependency. Dev data (SQLite DB) goes in `./data/` (git-ignored).
+- **Tests:** use `fastapi.testclient.TestClient` (backed by `httpx2`; plain
+  `httpx` triggers a Starlette deprecation warning).
 
 - **Secrets:** config comes from environment variables only. Never commit the
   Mealie token; a local `.env` is git-ignored.
