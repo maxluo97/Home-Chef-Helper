@@ -7,17 +7,28 @@ answer 404, exactly like IDs that don't exist.
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import AwareDatetime, BaseModel, Field
 
-from app.api.deps import ActiveHouseholdId, CurrentLoginSession, DbSession
+from app.api.deps import ActiveHouseholdId, AppSettings, CurrentLoginSession, DbSession
+from app.api.mealie import MealieClientFactoryDep
+from app.core.config import Settings
 from app.domain.ratings import average_stars, latest_rating_per_user
+from app.integrations.mealie_client import MealieError
 from app.models import CookEvent, Recipe, User
 from app.models.cooking import MAX_STARS, MIN_STARS
-from app.services import cook_log
+from app.services import cook_log, mealie_link
 from app.services.accounts import list_members
+from app.services.mealie_link import MealieClientFactory
+from app.services.mealie_writeback import write_back_one
+
+# Outcome of writing a cook back to Mealie right after it was saved:
+# - "up_to_date": Mealie now matches the cook log
+# - "pending": Mealie couldn't be reached; the next recipe sync retries
+# - "not_connected": the household has no working Mealie link
+WritebackStatus = Literal["up_to_date", "pending", "not_connected"]
 
 router = APIRouter(tags=["cooking"])
 
@@ -74,6 +85,8 @@ class CookEventOut(BaseModel):
     servings: int | None
     notes: str | None
     logged_by: PersonOut | None
+    # Only on responses to a change (log/edit); None in log listings.
+    mealie_writeback: WritebackStatus | None = None
 
 
 class RateRequest(BaseModel):
@@ -136,6 +149,25 @@ def person_for(db: DbSession, people: dict[int, PersonOut], user_id: int | None)
     return PersonOut(user_id=user_id, display_name=former_member.display_name) if former_member else None
 
 
+def try_write_back(
+    db: DbSession, settings: Settings, make_client: MealieClientFactory, household_id: int, recipe_id: int
+) -> WritebackStatus:
+    """Push a recipe's latest cook to Mealie now, without ever failing the request.
+
+    The cook is already saved locally; a Mealie problem only leaves the
+    write-back pending for the next sync (plan §10: degrade gracefully).
+    """
+    try:
+        with mealie_link.open_mealie_client(db, settings, make_client, household_id) as mealie:
+            write_back_one(db, mealie, household_id, recipe_id)
+    except (mealie_link.MealieNotConfiguredError, mealie_link.MealieNotConnectedError):
+        return "not_connected"
+    except MealieError:
+        db.rollback()  # discard any half-recorded state; it's retried at sync
+        return "pending"
+    return "up_to_date"
+
+
 def cook_event_out(db: DbSession, cook_event: CookEvent, people: dict[int, PersonOut]) -> CookEventOut:
     """Build the response for one cook-log entry."""
     return CookEventOut(
@@ -160,8 +192,14 @@ def log_cook(
     household_id: ActiveHouseholdId,
     login_session: CurrentLoginSession,
     db: DbSession,
+    settings: AppSettings,
+    make_client: MealieClientFactoryDep,
 ) -> CookEventOut:
-    """'I cooked this': record a cook, optionally with your rating."""
+    """'I cooked this': record a cook, optionally with your rating.
+
+    Then updates Mealie's "last made" (and clears want-to-try after the
+    first cook); `mealie_writeback` in the response says how that went.
+    """
     with cook_log_errors_as_http():
         cook_event = cook_log.log_cook(
             db, household_id, recipe_id, login_session.user_id,
@@ -171,7 +209,10 @@ def log_cook(
             notes=payload.notes,
             stars=payload.stars,
         )
-    return cook_event_out(db, cook_event, people_by_id(db, household_id))
+    writeback_status = try_write_back(db, settings, make_client, household_id, recipe_id)
+    response = cook_event_out(db, cook_event, people_by_id(db, household_id))
+    response.mealie_writeback = writeback_status
+    return response
 
 
 @router.get("/api/cooks")
@@ -191,7 +232,12 @@ def list_cooks(
 
 @router.patch("/api/cooks/{cook_event_id}")
 def update_cook(
-    cook_event_id: int, payload: UpdateCookRequest, household_id: ActiveHouseholdId, db: DbSession
+    cook_event_id: int,
+    payload: UpdateCookRequest,
+    household_id: ActiveHouseholdId,
+    db: DbSession,
+    settings: AppSettings,
+    make_client: MealieClientFactoryDep,
 ) -> CookEventOut:
     """Edit an entry. Send only the fields to change; `null` clears notes/servings."""
     # model_fields_set = the keys actually present in the JSON body, which
@@ -199,14 +245,31 @@ def update_cook(
     changes = {field_name: getattr(payload, field_name) for field_name in payload.model_fields_set}
     with cook_log_errors_as_http():
         cook_event = cook_log.update_cook(db, household_id, cook_event_id, changes)
-    return cook_event_out(db, cook_event, people_by_id(db, household_id))
+
+    # A changed cook time can change which cook is the latest.
+    writeback_status = try_write_back(db, settings, make_client, household_id, cook_event.recipe_id)
+    response = cook_event_out(db, cook_event, people_by_id(db, household_id))
+    response.mealie_writeback = writeback_status
+    return response
 
 
 @router.delete("/api/cooks/{cook_event_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_cook(cook_event_id: int, household_id: ActiveHouseholdId, db: DbSession) -> None:
-    """Remove an entry (any member may). Ratings given with it are kept."""
+def delete_cook(
+    cook_event_id: int,
+    household_id: ActiveHouseholdId,
+    db: DbSession,
+    settings: AppSettings,
+    make_client: MealieClientFactoryDep,
+) -> None:
+    """Remove an entry (any member may). Ratings given with it are kept.
+
+    If it was the latest cook, Mealie's "last made" moves back to the
+    previous one (best effort, like logging).
+    """
     with cook_log_errors_as_http():
+        recipe_id = cook_log.get_household_cook(db, household_id, cook_event_id).recipe_id
         cook_log.delete_cook(db, household_id, cook_event_id)
+    try_write_back(db, settings, make_client, household_id, recipe_id)
 
 
 # --- Rating routes ---

@@ -26,7 +26,8 @@ don't duplicate it here.
      Nightly scheduled sync still to add (APScheduler; planned alongside block 9).
   6. ✅ Cook log + per-person ratings (whole stars, latest wins, history kept). (v0.0.6)
   7. Jinja + htmx UI.
-  8. Mealie "last made" write-back.
+  8. ✅ Mealie write-back: "last made" + clear want-to-try after first cook. (v0.0.7)
+     Built before block 7 so the UI can show write-back status.
   9. Dockerfile + add Chef Helper to `compose.dev.yaml`.
 - Mealie credentials are **per household**, encrypted in the DB with the
   installation key `CHEF_SECRET_KEY` (plan §9.8). Local `.env` holds
@@ -134,6 +135,15 @@ py scripts/list_mealie_recipes.py
   Ratings are append-only; "latest per person wins" lives in
   `app/domain/ratings.py`. API datetimes must carry a timezone
   (`AwareDatetime`); naive ones get 422.
+- **Mealie write-back:** best effort, never fails a request. Rules in
+  `app/domain/writeback.py` (last made = latest cook; never moves backwards
+  on a back-dated cook, moves back when the latest cook is deleted; can't be
+  cleared via API; want-to-try cleared once, tracked by
+  `recipes.want_to_try_cleared_at`). Pending write-backs retry after every
+  recipe sync. Mealie tags are group-wide, so clearing want-to-try affects
+  every Mealie household in the group.
+- **Probing Mealie writes:** test on a throwaway recipe (POST /api/recipes,
+  then DELETE), never on the owner's real recipes.
 - **Fake Mealie for tests:** `tests/fake_mealie.py` (`FakeMealie`): add/edit/
   delete recipes, small pages, and `fail_after_requests` to simulate outages.
 - **Tests:** the `client` fixture (tests/conftest.py) is a started app on a

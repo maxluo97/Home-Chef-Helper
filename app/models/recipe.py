@@ -48,6 +48,14 @@ class Recipe(Base):
     # Set when the recipe disappears from Mealie; cleared if it comes back.
     removed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 
+    # --- Write-back to Mealie (app/services/mealie_writeback.py) ---
+    # The "last made" time Chef Helper last wrote to Mealie successfully. If
+    # the household's latest cook differs, a write-back is pending.
+    mealie_last_made_pushed: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    # When Chef Helper removed the want-to-try tag after the first cook
+    # (plan §9.7). Set once, so a tag re-added by hand later is left alone.
+    want_to_try_cleared_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+
     # Ingredient lines in recipe order. Replacing the list deletes old lines.
     ingredients: Mapped[list["RecipeIngredient"]] = relationship(
         back_populates="recipe",

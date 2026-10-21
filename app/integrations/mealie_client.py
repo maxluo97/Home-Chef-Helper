@@ -11,9 +11,13 @@ Facts verified against the spec (plan §2.3 / §9.8 [VERIFY] items):
   added it (`householdId`), and other households in the group can see it
   unless that household's "private household" preference is on.
 - "Last made" is tracked per household (`/api/households/self/recipes/{slug}`).
+- Verified by probing a throwaway recipe: PATCH /api/recipes/{slug} with only
+  `tags` changes only the tags; PATCH .../last-made accepts any time, even
+  one earlier than the current value, and adds no timeline event.
 """
 
 from collections.abc import Iterator
+from datetime import datetime
 from typing import Any, Self
 
 import httpx2
@@ -172,8 +176,21 @@ class MealieClient:
 
     def _get_json(self, api_path: str, params: dict[str, Any] | None = None) -> Any:
         """GET a path and return decoded JSON, raising MealieError subclasses."""
+        return self._request_json("GET", api_path, params=params)
+
+    def _request_json(
+        self,
+        http_method: str,
+        api_path: str,
+        params: dict[str, Any] | None = None,
+        json_body: Any = None,
+    ) -> Any:
+        """Send one request and return decoded JSON (or None if empty).
+
+        Raises MealieError subclasses for every failure.
+        """
         try:
-            response = self._http.get(api_path, params=params)
+            response = self._http.request(http_method, api_path, params=params, json=json_body)
         except httpx2.TransportError as transport_error:
             # Connection refused, DNS failure, timeout, ...
             raise MealieUnavailableError(f"Could not reach Mealie: {transport_error}") from transport_error
@@ -187,7 +204,7 @@ class MealieClient:
         if response.status_code >= 400:
             # Anything else is a bug on our side (bad parameters), not the user's.
             raise MealieError(f"Mealie returned {response.status_code} on {api_path}: {response.text[:200]}")
-        return response.json()
+        return response.json() if response.content else None
 
     # --- Endpoints ---
 
@@ -222,3 +239,33 @@ class MealieClient:
     def get_recipe(self, slug: str) -> MealieRecipe:
         """Full recipe (with ingredients) by slug. Raises MealieNotFoundError."""
         return MealieRecipe.model_validate(self._get_json(f"/api/recipes/{slug}"))
+
+    # --- Writes (plan §2.3: keep Mealie's UI consistent with our cook log) ---
+
+    def get_last_made(self, slug: str) -> str | None:
+        """This token's household's "last made" time for a recipe (raw text)."""
+        return self._get_json(f"/api/households/self/recipes/{slug}").get("lastMade")
+
+    def set_last_made(self, slug: str, made_at: datetime) -> None:
+        """Set this household's "last made" time for a recipe.
+
+        Mealie stores whatever it's given, even an earlier time than before,
+        so callers decide which time is right.
+        """
+        self._request_json(
+            "PATCH", f"/api/recipes/{slug}/last-made", json_body={"timestamp": made_at.isoformat()}
+        )
+
+    def remove_recipe_tag(self, slug: str, tag_slug: str) -> bool:
+        """Remove one tag from a recipe; True if it was there.
+
+        PATCH replaces the recipe's whole tag list (verified: other recipe
+        fields are left alone), so the current list is read first and sent
+        back without the one tag. Tags are shared by the Mealie group.
+        """
+        current_tags = self._get_json(f"/api/recipes/{slug}").get("tags") or []
+        remaining_tags = [tag for tag in current_tags if tag.get("slug") != tag_slug]
+        if len(remaining_tags) == len(current_tags):
+            return False
+        self._request_json("PATCH", f"/api/recipes/{slug}", json_body={"tags": remaining_tags})
+        return True

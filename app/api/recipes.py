@@ -16,7 +16,9 @@ from app.api.mealie import MealieClientFactoryDep, mealie_errors_as_http
 from app.domain.ingredients import is_want_to_try
 from app.models import Household, Recipe
 from app.services import mealie_link
+from app.integrations.mealie_client import MealieError
 from app.services.cook_log import RecipeCookStats, household_recipe_stats
+from app.services.mealie_writeback import WritebackResult, count_pending, plan_for_recipe, write_back_household
 from app.services.recipe_sync import sync_household_recipes
 
 router = APIRouter(prefix="/api/recipes", tags=["recipes"])
@@ -26,7 +28,7 @@ router = APIRouter(prefix="/api/recipes", tags=["recipes"])
 
 
 class RecipeSyncOut(BaseModel):
-    """Counts from one sync run."""
+    """Counts from one sync run, including the write-back pass after it."""
 
     added: int
     updated: int
@@ -34,6 +36,10 @@ class RecipeSyncOut(BaseModel):
     removed: int
     restored: int
     finished_at: datetime
+    # --- Write-back of the cook log to Mealie ---
+    last_made_updated: int
+    want_to_try_cleared: int
+    writeback_pending: int  # still not written (Mealie failed part-way)
 
 
 class RecipeOut(BaseModel):
@@ -51,10 +57,13 @@ class RecipeOut(BaseModel):
     last_cooked_at: datetime | None
     average_stars: float | None  # mean of each member's latest rating
     my_stars: int | None  # the caller's latest rating
+    # True if Mealie hasn't yet been told about the latest cook (retried at sync).
+    mealie_writeback_pending: bool
 
     @classmethod
     def from_recipe(cls, recipe: Recipe, stats: RecipeCookStats | None, user_id: int) -> "RecipeOut":
         """Build from a cached recipe (ingredients loaded) and its stats."""
+        writeback_pending = recipe.removed_at is None and plan_for_recipe(recipe, stats).is_needed
         stats = stats or RecipeCookStats()
         my_latest = stats.latest_ratings.get(user_id)
         return cls(
@@ -69,6 +78,7 @@ class RecipeOut(BaseModel):
             last_cooked_at=stats.last_cooked_at,
             average_stars=stats.average_stars,
             my_stars=my_latest.stars if my_latest else None,
+            mealie_writeback_pending=writeback_pending,
         )
 
 
@@ -112,11 +122,27 @@ def sync_recipes(
     """Refresh the active household's library from Mealie now.
 
     `?full_refresh=true` re-downloads every recipe, not just changed ones.
+    Afterwards, any cook-log changes Mealie hasn't heard about yet ("last
+    made", want-to-try) are written back.
     """
     with mealie_errors_as_http():
         with mealie_link.open_mealie_client(db, settings, make_client, household_id) as mealie:
-            result = sync_household_recipes(db, mealie, household_id, full_refresh=full_refresh)
-    return RecipeSyncOut(**vars(result))
+            sync_result = sync_household_recipes(db, mealie, household_id, full_refresh=full_refresh)
+
+            # The sync itself is saved; a write-back failure only leaves
+            # some recipes pending, reported in the counts.
+            writeback_result = WritebackResult()
+            try:
+                writeback_result = write_back_household(db, mealie, household_id)
+            except MealieError:
+                db.rollback()
+
+    return RecipeSyncOut(
+        **vars(sync_result),
+        last_made_updated=writeback_result.last_made_updated,
+        want_to_try_cleared=writeback_result.want_to_try_cleared,
+        writeback_pending=count_pending(db, household_id),
+    )
 
 
 @router.get("")

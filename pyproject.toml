@@ -5,7 +5,7 @@
 
 [project]
 name = "chef-helper"
-version = "0.0.6"
+version = "0.0.7"
 description = "Household kitchen assistant: cook log, ratings, approximate inventory, and recipe suggestions alongside Mealie."
 readme = "README.md"
 requires-python = ">=3.13"

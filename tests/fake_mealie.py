@@ -5,6 +5,7 @@ via `client()`. It can also be told to fail after N requests, to check that
 callers don't leave half-finished work behind.
 """
 
+import json
 from dataclasses import dataclass, field
 from itertools import count
 
@@ -38,6 +39,10 @@ class FakeMealie:
     per_page: int = 2  # small, so multi-page listing is exercised
     fail_after_requests: int | None = None  # simulate Mealie dying mid-sync
     requests_seen: list[str] = field(default_factory=list)
+    # Household "last made" per slug, as Mealie would return it.
+    last_made: dict[str, str] = field(default_factory=dict)
+    # Write calls received, as (method, path), for assertions.
+    writes_seen: list[tuple[str, str]] = field(default_factory=list)
 
     # --- Test controls ---
 
@@ -79,10 +84,33 @@ class FakeMealie:
             })
         if request.url.path == "/api/recipes":
             return self.recipe_page(int(request.url.params["page"]))
+
+        # --- Household view of a recipe (last made) ---
+        if request.url.path.startswith("/api/households/self/recipes/"):
+            slug = request.url.path.removeprefix("/api/households/self/recipes/")
+            if slug not in self.recipes:
+                return httpx2.Response(404, json={"detail": "Not found"})
+            return httpx2.Response(200, json={"recipeId": self.recipes[slug]["id"],
+                                              "lastMade": self.last_made.get(slug)})
+
+        # --- Set last made ---
+        if request.url.path.endswith("/last-made") and request.method == "PATCH":
+            slug = request.url.path.removeprefix("/api/recipes/").removesuffix("/last-made")
+            if slug not in self.recipes:
+                return httpx2.Response(404, json={"detail": "Not found"})
+            self.writes_seen.append(("PATCH", request.url.path))
+            self.last_made[slug] = json.loads(request.content)["timestamp"]
+            return httpx2.Response(200, json={})
+
+        # --- One recipe: read, or patch its tags ---
         if request.url.path.startswith("/api/recipes/"):
             slug = request.url.path.removeprefix("/api/recipes/")
             if slug not in self.recipes:
                 return httpx2.Response(404, json={"detail": "Not found"})
+            if request.method == "PATCH":
+                self.writes_seen.append(("PATCH", request.url.path))
+                self.recipes[slug]["tags"] = json.loads(request.content).get("tags") or None
+                return httpx2.Response(200, json=self.recipes[slug])
             return httpx2.Response(200, json=self.recipes[slug])
         return httpx2.Response(404)
 
