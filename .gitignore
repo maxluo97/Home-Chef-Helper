@@ -1,0 +1,12 @@
+# Real grocery orders: personal purchase history, kept local only
+tests/fixtures/wholefoods/private/
+
+# Local secrets and environment files (e.g. MEALIE_TOKEN)
+.env
+.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
