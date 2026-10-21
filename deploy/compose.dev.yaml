@@ -1,0 +1,41 @@
+# Local development stack for Home Chef Helper.
+#
+# Phase 0: runs Mealie only. Chef Helper itself will be added as a second
+# service once its skeleton exists (Phase 1).
+#
+# Usage (from the repo root):
+#   docker compose -f deploy/compose.dev.yaml up -d     # start
+#   docker compose -f deploy/compose.dev.yaml down      # stop (data is kept)
+#
+# Mealie UI:       http://localhost:9925
+# Mealie API docs: http://localhost:9925/docs
+
+name: chef-helper-dev
+
+services:
+  # --- Mealie: recipe storage, ratings, households (we integrate via its API) ---
+  mealie:
+    # Pinned to an exact release so dev matches what we test against.
+    # Bump deliberately; check Mealie's release notes for API changes first.
+    image: ghcr.io/mealie-recipes/mealie:v3.29.0
+    container_name: chef-helper-dev-mealie
+    restart: unless-stopped
+    ports:
+      - "9925:9000"            # host:container — Mealie listens on 9000 inside
+    environment:
+      TZ: America/New_York     # matches the dev PC (Eastern Time)
+      BASE_URL: http://localhost:9925
+      ALLOW_SIGNUP: "false"    # accounts are created by an admin, not self-signup
+      PUID: 1000
+      PGID: 1000
+    volumes:
+      - mealie-data:/app/data  # SQLite DB, images, backups
+    deploy:
+      resources:
+        limits:
+          memory: 1000M        # Mealie's documented recommendation
+
+volumes:
+  # Named volume so dev data survives container rebuilds.
+  # Wipe it with: docker compose -f deploy/compose.dev.yaml down -v
+  mealie-data:
