@@ -18,7 +18,7 @@ don't duplicate it here.
 - **Phase 0: done.** Local Mealie runs in Docker; `scripts/list_mealie_recipes.py`
   lists recipes with an API token. One recipe imported so far.
 - **Phase 1: in progress.** Built as small, separately tested blocks:
-  1. ✅ Scaffold: uv project, `app/` package, env config, `/healthz`, pytest.
+  1. ✅ Scaffold: uv project, `app/` package, env config, `/healthz`, pytest. (v0.0.1)
   2. DB + Alembic migrations (SQLite WAL, upgrade on startup).
   3. Accounts + households + join code (every household-owned table has `household_id`).
   4. `mealie_client` (list/get recipes) against the live OpenAPI spec.
@@ -29,6 +29,25 @@ don't duplicate it here.
   9. Dockerfile + add Chef Helper to `compose.dev.yaml`.
 - Mealie credentials are **per household**, encrypted in the DB (plan §9.8).
 - The NAS (HexOS) is not set up yet; everything runs on the dev PC until Phase 5.
+
+## Versions and phases
+
+The global versioning rules apply (tags down to `vX.Y.Z`; `version` in
+`pyproject.toml` kept in step). Planned mapping onto the plan §8 phases:
+
+| Version | Milestone |
+|---|---|
+| `v0.0.x` | Phase 0 + Phase 1 blocks, on the way to the first usable version. Block 1 (plus the Phase 0 setup) = `v0.0.1`. |
+| `v0.1` | Phase 1 acceptance criteria pass (cook log, ratings, Mealie write-back). |
+| `v0.2` / `v0.3` / `v0.4` | Phases 2 / 3 / 4 pass (inventory + Whole Foods paste / recommendations / check-ins). |
+| `v1.0` | Phase 5: first production release, running on the NAS. |
+| `v1.1`+ | Phase 6 (optional LLM layer), then "later ideas." |
+
+- Within a phase, a finished block (or a group of small blocks) bumps the third
+  place: e.g. Phase 2 blocks are `v0.1.1`, `v0.1.2`, ... until `v0.2`.
+- The mapping isn't strictly 1-to-1. If a phase is big enough to deserve two
+  releases, it can take two second-place numbers, and later phases shift up.
+  Ask the owner before doing that.
 
 ## Dev environment
 
