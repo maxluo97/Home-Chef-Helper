@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Cook log · Chef Helper{% endblock %}
+{% block content %}
+<h2>Cook log</h2>
+{% for entry in entries %}
+<a class="recipe-row" href="/recipes/{{ entry.recipe_id }}">
+  <strong>{{ entry.recipe_name }}</strong>
+  <p class="meta">
+    {{ entry.cooked_at | local_datetime(tz) }} ({{ entry.cooked_at | relative_time(now) }}) · {{ entry.cook_name }}
+    {% if entry.servings %}· serves {{ entry.servings }}{% endif %}
+    {% if entry.notes %}<br>“{{ entry.notes }}”{% endif %}
+  </p>
+</a>
+{% else %}
+<p class="meta">Nothing logged yet. Open a recipe and press <strong>Log it</strong> after you cook.</p>
+{% endfor %}
+{% endblock %}

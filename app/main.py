@@ -8,11 +8,15 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from app.api import auth, cooking, health, households, mealie, recipes
 from app.core.config import Settings, get_settings
 from app.core.db import make_engine, make_session_factory
 from app.core.migrate import upgrade_to_head
+from app.web import pages_accounts, pages_pwa, pages_recipes
+from app.web.deps import install_redirect_handlers
+from app.web.templating import STATIC_DIR
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -45,13 +49,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # Routes that depend on get_settings() see this app's settings.
     application.dependency_overrides[get_settings] = lambda: app_settings
 
-    # --- Routers ---
+    # --- JSON API routers ---
     application.include_router(health.router)
     application.include_router(auth.router)
     application.include_router(households.router)
     application.include_router(mealie.router)
     application.include_router(recipes.router)
     application.include_router(cooking.router)
+
+    # --- Web pages (server-rendered) and their static files ---
+    application.include_router(pages_accounts.router)
+    application.include_router(pages_recipes.router)
+    application.include_router(pages_pwa.router)
+    application.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+    install_redirect_handlers(application)
 
     return application
 

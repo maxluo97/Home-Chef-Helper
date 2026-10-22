@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import Settings
 from app.core.crypto import SecretBox, SecretDecryptionError
-from app.integrations.mealie_client import MealieAuthError, MealieClient
+from app.integrations.mealie_client import MealieAuthError, MealieClient, MealieNotFoundError
 from app.models import Household
 from app.models.base import utc_now
 from app.services.accounts import NotAMemberError, is_member
@@ -81,6 +81,11 @@ def connect_mealie(
     try:
         with make_client(api_token) as mealie:
             mealie_user = mealie.get_current_user()
+            # Group slug is only for "Open in Mealie" links; nice to have.
+            try:
+                mealie_group_slug = mealie.get_current_group().slug
+            except MealieNotFoundError:
+                mealie_group_slug = None
     except MealieAuthError as auth_error:
         raise MealieTokenRejectedError("Mealie rejected this token.") from auth_error
 
@@ -90,6 +95,7 @@ def connect_mealie(
     household.mealie_household_id = mealie_user.household_id
     household.mealie_household_name = mealie_user.household
     household.mealie_group_id = mealie_user.group_id
+    household.mealie_group_slug = mealie_group_slug
     household.mealie_connected_at = utc_now()
     db.commit()
     return household
@@ -103,6 +109,7 @@ def disconnect_mealie(db: Session, user_id: int, household_id: int) -> None:
     household.mealie_household_id = None
     household.mealie_household_name = None
     household.mealie_group_id = None
+    household.mealie_group_slug = None
     household.mealie_connected_at = None
     db.commit()
 

@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}{{ recipe.name }} · Chef Helper{% endblock %}
+{% block nav_left %}← Recipes{% endblock %}
+{% block content %}
+<h2 style="margin-bottom: 0.25rem;">{{ recipe.name }}</h2>
+{% if mealie_link %}<p class="meta"><a href="{{ mealie_link }}" target="_blank" rel="noopener">Open in Mealie ↗</a></p>{% endif %}
+{% if recipe.removed_at %}<p class="notice warn">This recipe was removed from Mealie. Its history is kept.</p>{% endif %}
+
+{% include "_recipe_activity.html" %}
+
+{# --- Ingredients: collapsed; the recipe itself is read in Mealie. --- #}
+<details>
+  <summary>Ingredients ({{ recipe_record.ingredients | length }})</summary>
+  <ul>
+    {% for line in recipe_record.ingredients %}
+      {% if line.section_title %}</ul><h6>{{ line.section_title }}</h6><ul>{% endif %}
+      <li>{{ line.display_text }}{% if line.is_optional %} <span class="meta">(optional)</span>{% endif %}</li>
+    {% endfor %}
+  </ul>
+</details>
+{% endblock %}

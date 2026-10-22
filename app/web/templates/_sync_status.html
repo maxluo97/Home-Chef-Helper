@@ -1,0 +1,9 @@
+{# Last-synced line, plus the result of a sync just run (if any). #}
+<div id="sync-status">
+  {% if message %}<p class="notice {{ message_kind }}">{{ message }}</p>{% endif %}
+  <p class="meta">
+    {% if active_household.recipes_synced_at %}
+      Synced from Mealie {{ active_household.recipes_synced_at | relative_time(now) }}
+    {% else %}Not synced from Mealie yet{% endif %}
+  </p>
+</div>

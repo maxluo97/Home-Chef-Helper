@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Households · Chef Helper{% endblock %}
+{% block content %}
+<h2>Households</h2>
+{% if error %}<p class="notice error">{{ error }}</p>{% endif %}
+
+{# --- The user's households, with a switch button --- #}
+{% if my_households %}
+<article>
+  <header>Your households</header>
+  {% for household in my_households %}
+  <div class="history-row">
+    <span>
+      <strong>{{ household.name }}</strong>
+      {% if active_household and household.id == active_household.id %}<span class="badge">ACTIVE</span>{% endif %}
+    </span>
+    {% if not active_household or household.id != active_household.id %}
+    <form method="post" action="/households/{{ household.id }}/switch">
+      <button class="link" type="submit">Switch to this</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endfor %}
+</article>
+{% else %}
+<p>You're not in a household yet. Create one, or join one with the code a member gives you.</p>
+{% endif %}
+
+{# --- Join an existing household --- #}
+<article>
+  <header>Join a household</header>
+  <form method="post" action="/households/join">
+    <fieldset role="group">
+      <input name="join_code" placeholder="Join code, e.g. K7QM-3XTW" autocapitalize="characters" required>
+      <button type="submit">Join</button>
+    </fieldset>
+  </form>
+</article>
+
+{# --- Create a new household --- #}
+<article>
+  <header>Create a household</header>
+  <form method="post" action="/households/create">
+    <fieldset role="group">
+      <input name="name" placeholder="e.g. Luo Kitchen" maxlength="100" required>
+      <button type="submit">Create</button>
+    </fieldset>
+  </form>
+</article>
+{% endblock %}

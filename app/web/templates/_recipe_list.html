@@ -1,0 +1,28 @@
+{# The recipe rows. Reloads itself when a sync finishes ("recipes-changed"). #}
+<div id="recipe-list"
+     hx-get="/recipes?q={{ search_text | urlencode }}&show={{ show }}"
+     hx-trigger="recipes-changed from:body" hx-swap="outerHTML">
+  {% for recipe in recipes %}
+  <a class="recipe-row" href="/recipes/{{ recipe.id }}">
+    <strong>{{ recipe.name }}</strong>
+    {% if recipe.want_to_try %}<span class="badge">WANT TO TRY</span>{% endif %}
+    {% if recipe.mealie_writeback_pending %}<span title="Mealie will be updated at the next sync">⏳</span>{% endif %}
+    <p class="meta">
+      {% if recipe.average_stars is not none %}
+        <span class="stars">{{ recipe.average_stars | stars }}</span> {{ "%.1f" | format(recipe.average_stars) }}
+      {% else %}not rated{% endif %}
+      ·
+      {% if recipe.cook_count %}cooked {{ recipe.cook_count }}× · {{ recipe.last_cooked_at | relative_time(now) }}
+      {% else %}never cooked{% endif %}
+    </p>
+  </a>
+  {% else %}
+  <p class="meta">
+    {% if search_text or show == "want" %}No recipes match.
+    {% elif active_household.recipes_synced_at %}No recipes in Mealie yet.
+    {% else %}No recipes yet. Press <strong>⟳ Sync</strong> to bring them in from Mealie
+      (connect Mealie first in <a href="/household/settings">Household settings</a>).
+    {% endif %}
+  </p>
+  {% endfor %}
+</div>

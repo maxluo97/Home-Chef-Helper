@@ -46,6 +46,9 @@ class Household(Base):
     mealie_household_id: Mapped[str | None] = mapped_column(String(MEALIE_ID_MAX_LENGTH))
     mealie_household_name: Mapped[str | None] = mapped_column(String(NAME_MAX_LENGTH))
     mealie_group_id: Mapped[str | None] = mapped_column(String(MEALIE_ID_MAX_LENGTH))
+    # Group's short name, used to build "Open in Mealie" links. None if
+    # Mealie didn't provide it (links are then hidden).
+    mealie_group_slug: Mapped[str | None] = mapped_column(String(NAME_MAX_LENGTH))
     mealie_connected_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     # When recipe sync last finished successfully (None = never).
     recipes_synced_at: Mapped[datetime | None] = mapped_column(UTCDateTime)

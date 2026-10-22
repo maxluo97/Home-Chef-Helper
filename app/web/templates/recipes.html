@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Recipes · Chef Helper{% endblock %}
+{% block content %}
+{# --- Title row with the sync button --- #}
+<div class="grid" style="align-items: center; grid-template-columns: 1fr auto;">
+  <h2 style="margin: 0;">Recipes</h2>
+  <form hx-post="/recipes/sync" hx-target="#sync-status" hx-swap="outerHTML" method="post" action="/recipes/sync">
+    <button type="submit" class="outline" style="margin: 0;">⟳ Sync</button>
+  </form>
+</div>
+{% include "_sync_status.html" %}
+
+{# --- Search and filter. Typing reloads only the list (htmx). --- #}
+<form method="get" action="/recipes" role="search" style="margin-top: 0.75rem;">
+  <input type="hidden" name="show" value="{{ show }}">
+  <input type="search" name="q" value="{{ search_text }}" placeholder="Search recipes…"
+         hx-get="/recipes" hx-trigger="input changed delay:300ms, search"
+         hx-target="#recipe-list" hx-swap="outerHTML" hx-include="closest form" hx-push-url="true">
+</form>
+<p>
+  <a href="/recipes?q={{ search_text | urlencode }}" role="button"
+     class="{{ '' if show != 'want' else 'outline' }}">All</a>
+  <a href="/recipes?show=want&q={{ search_text | urlencode }}" role="button"
+     class="{{ '' if show == 'want' else 'outline' }}">Want to try</a>
+</p>
+
+{% include "_recipe_list.html" %}
+{% endblock %}

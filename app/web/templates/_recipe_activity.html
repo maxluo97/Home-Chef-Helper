@@ -1,0 +1,102 @@
+{# Everything on the recipe page that changes when someone logs, rates, or
+   edits. htmx actions replace this whole section with a fresh copy. #}
+<section id="recipe-activity">
+  {# --- Summary --- #}
+  <p class="meta">
+    {% if recipe.want_to_try %}<span class="badge">WANT TO TRY</span> {% endif %}
+    {% if recipe.average_stars is not none %}
+      Household <span class="stars">{{ recipe.average_stars | stars }}</span>
+      {{ "%.1f" | format(recipe.average_stars) }} ({{ people_ratings | length }}
+      {{ "person" if people_ratings | length == 1 else "people" }})
+    {% else %}Not rated yet{% endif %}
+    <br>
+    {% if recipe.cook_count %}
+      Cooked {{ recipe.cook_count }}× · last {{ history[0].cooked_at | local_date(tz) }} by {{ history[0].cook_name }}
+      {% if recipe.mealie_writeback_pending %}<span title="Mealie will be updated at the next sync">⏳</span>{% endif %}
+    {% else %}Never cooked{% endif %}
+  </p>
+
+  {% if message %}<p class="notice {{ message_kind }}">{{ message }}</p>{% endif %}
+
+  {# --- I cooked this --- #}
+  <article>
+    <header><strong>I cooked this</strong></header>
+    <form method="post" action="/recipes/{{ recipe.id }}/cooks"
+          hx-post="/recipes/{{ recipe.id }}/cooks" hx-target="#recipe-activity" hx-swap="outerHTML">
+      <div class="grid">
+        <label>Who
+          <select name="cooked_by_user_id">
+            {% for member in members %}
+            <option value="{{ member.id }}" {{ "selected" if member.id == user.id }}>
+              {{ member.display_name }}{{ " (me)" if member.id == user.id }}
+            </option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>When
+          <input type="datetime-local" name="cooked_at" value="{{ now | datetime_local_value(tz) }}">
+        </label>
+      </div>
+      <fieldset>
+        <legend>Your stars <span class="meta">(optional)</span></legend>
+        <div class="star-radio">
+          <label><input type="radio" name="stars" value="" checked> skip</label>
+          {% for star_count in range(1, 6) %}
+          <label><input type="radio" name="stars" value="{{ star_count }}"> {{ star_count }}★</label>
+          {% endfor %}
+        </div>
+      </fieldset>
+      <div class="grid">
+        <label>Servings <input type="number" name="servings" min="1" max="100" inputmode="numeric"></label>
+        <label>Notes <input name="notes" maxlength="2000" placeholder="e.g. a bit salty"></label>
+      </div>
+      <button type="submit">Log it</button>
+    </form>
+  </article>
+
+  {# --- Your rating: tap a star --- #}
+  <p>
+    Your rating
+    <span class="star-picker">
+      {% for star_count in range(1, 6) %}
+      <button type="button" aria-label="{{ star_count }} stars"
+              hx-post="/recipes/{{ recipe.id }}/rating" hx-vals='{"stars": "{{ star_count }}"}'
+              hx-target="#recipe-activity" hx-swap="outerHTML">
+        {{ "★" if recipe.my_stars and star_count <= recipe.my_stars else "☆" }}
+      </button>
+      {% endfor %}
+    </span>
+  </p>
+
+  {# --- Everyone's ratings --- #}
+  {% if people_ratings %}
+  <details open>
+    <summary>Ratings</summary>
+    {% for person_rating in people_ratings %}
+    <div>{{ person_rating.display_name }} <span class="stars">{{ person_rating.stars | stars }}</span></div>
+    {% endfor %}
+  </details>
+  {% endif %}
+
+  {# --- Cook history, with inline edit and delete --- #}
+  <details open>
+    <summary>Cook history ({{ history | length }})</summary>
+    {% for entry in history %}
+    <div class="history-row" id="cook-{{ entry.id }}">
+      <span>
+        {{ entry.cooked_at | local_date(tz) }} · {{ entry.cook_name }}
+        {% if entry.servings %}· serves {{ entry.servings }}{% endif %}
+        {% if entry.notes %}· “{{ entry.notes }}”{% endif %}
+      </span>
+      <span class="actions">
+        <button class="link" hx-get="/cooks/{{ entry.id }}/edit" hx-target="#cook-{{ entry.id }}"
+                hx-swap="outerHTML">✎ edit</button>
+        <button class="link" hx-post="/cooks/{{ entry.id }}/delete" hx-target="#recipe-activity"
+                hx-swap="outerHTML" hx-confirm="Delete this entry?">delete</button>
+      </span>
+    </div>
+    {% else %}
+    <p class="meta">Nobody has logged this yet.</p>
+    {% endfor %}
+  </details>
+</section>

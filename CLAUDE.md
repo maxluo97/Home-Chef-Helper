@@ -25,7 +25,7 @@ don't duplicate it here.
   5. ✅ Recipe sync (on demand) into `recipes` / `recipe_ingredients`. (v0.0.5)
      Nightly scheduled sync still to add (APScheduler; planned alongside block 9).
   6. ✅ Cook log + per-person ratings (whole stars, latest wins, history kept). (v0.0.6)
-  7. Jinja + htmx UI.
+  7. ✅ Jinja + htmx UI (Pico CSS), installable PWA. (v0.0.8)
   8. ✅ Mealie write-back: "last made" + clear want-to-try after first cook. (v0.0.7)
      Built before block 7 so the UI can show write-back status.
   9. Dockerfile + add Chef Helper to `compose.dev.yaml`.
@@ -144,6 +144,19 @@ py scripts/list_mealie_recipes.py
   every Mealie household in the group.
 - **Probing Mealie writes:** test on a throwaway recipe (POST /api/recipes,
   then DELETE), never on the owner's real recipes.
+- **Web UI (`app/web/`):** pages call the same services as the JSON API.
+  `WebLoginSession` / `WebActiveHousehold` redirect (to /login, /households)
+  instead of 401/409; htmx requests get `HX-Redirect`. Recipe-page actions
+  return the `#recipe-activity` fragment for htmx, and redirect otherwise.
+  Templates auto-escape; never mark user or Mealie text `|safe`. Messages
+  shown from URL params must come from a fixed table (see `HOUSEHOLD_ERRORS`).
+  Pico CSS and htmx are vendored in `app/web/static/vendor/` (no CDN; the NAS
+  may be offline). Times display in `TZ`; datetime-local inputs are read in
+  `TZ`. "Open in Mealie" uses `MEALIE_PUBLIC_URL` + `/g/{group slug}/r/{slug}`.
+- **PWA:** `/manifest.webmanifest`, `/sw.js` (no caching yet), icons in
+  `app/web/static/icons/`. "Install" needs HTTPS (Tailscale) or localhost.
+- **Trying the UI on the dev Mealie:** logging a cook writes "last made" to
+  that Mealie recipe and clears want-to-try after the first cook.
 - **Fake Mealie for tests:** `tests/fake_mealie.py` (`FakeMealie`): add/edit/
   delete recipes, small pages, and `fail_after_requests` to simulate outages.
 - **Tests:** the `client` fixture (tests/conftest.py) is a started app on a

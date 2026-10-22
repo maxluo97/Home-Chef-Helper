@@ -72,6 +72,14 @@ class MealieUser(MealieModel):
     group: str  # group name
 
 
+class MealieGroup(MealieModel):
+    """The Mealie group a token's user belongs to."""
+
+    id: str
+    name: str
+    slug: str  # used in Mealie's web addresses: /g/{slug}/r/{recipe slug}
+
+
 class MealieTag(MealieModel):
     """A recipe tag, e.g. "want-to-try" (plan §9.7)."""
 
@@ -214,6 +222,10 @@ class MealieClient:
         Also the cheapest way to check that a token works.
         """
         return MealieUser.model_validate(self._get_json("/api/users/self"))
+
+    def get_current_group(self) -> MealieGroup:
+        """The token user's group (its slug is needed for recipe page links)."""
+        return MealieGroup.model_validate(self._get_json("/api/groups/self"))
 
     def iter_recipe_summaries(self, per_page: int = RECIPES_PER_PAGE) -> Iterator[MealieRecipeSummary]:
         """Yield every recipe this token can see, walking all pages."""

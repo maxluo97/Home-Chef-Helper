@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Chef Helper{% endblock %}</title>
+  <link rel="stylesheet" href="/static/vendor/pico-2.0.6.min.css">
+  <link rel="stylesheet" href="/static/app.css">
+  {# --- Installable app (PWA) --- #}
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#d9822b">
+  <link rel="icon" href="/static/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+  <script src="/static/vendor/htmx-2.0.4.min.js" defer></script>
+</head>
+<body>
+  {# --- Top bar: brand, household switcher, menu (only when logged in) --- #}
+  <nav class="app-nav">
+    <ul>
+      <li><a class="brand" href="/">{% block nav_left %}🍳 Chef Helper{% endblock %}</a></li>
+    </ul>
+    {% if user %}
+    <ul>
+      <li>
+        <details class="dropdown">
+          <summary>{{ active_household.name if active_household else "No household" }}</summary>
+          <ul dir="rtl">
+            {% for household in my_households %}
+            <li>
+              <form method="post" action="/households/{{ household.id }}/switch">
+                <button class="link" type="submit">
+                  {{ "✓ " if active_household and household.id == active_household.id }}{{ household.name }}
+                </button>
+              </form>
+            </li>
+            {% endfor %}
+            <li><a href="/households">Add or join…</a></li>
+          </ul>
+        </details>
+      </li>
+      <li>
+        <details class="dropdown">
+          <summary aria-label="Menu">☰</summary>
+          <ul dir="rtl">
+            <li><a href="/recipes">Recipes</a></li>
+            <li><a href="/cooks">Cook log</a></li>
+            <li><a href="/household/settings">Household settings</a></li>
+            <li>
+              <form method="post" action="/logout">
+                <button class="link" type="submit">Log out ({{ user.display_name }})</button>
+              </form>
+            </li>
+          </ul>
+        </details>
+      </li>
+    </ul>
+    {% endif %}
+  </nav>
+
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+
+  {# Register the service worker so phones offer "Install app". #}
+  <script>
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+    }
+  </script>
+</body>
+</html>

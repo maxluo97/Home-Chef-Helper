@@ -82,6 +82,8 @@ class FakeMealie:
                 "household": "Family", "householdId": "household-1",
                 "group": "Home", "groupId": "group-1",
             })
+        if request.url.path == "/api/groups/self":
+            return httpx2.Response(200, json={"id": "group-1", "name": "Home", "slug": "home"})
         if request.url.path == "/api/recipes":
             return self.recipe_page(int(request.url.params["page"]))
 

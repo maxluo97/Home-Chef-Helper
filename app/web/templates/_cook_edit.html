@@ -1,0 +1,23 @@
+{# Inline edit form that replaces one cook-history row. #}
+<form class="history-row" id="cook-{{ entry.id }}" style="display: block;"
+      hx-post="/cooks/{{ entry.id }}/edit" hx-target="#recipe-activity" hx-swap="outerHTML">
+  <div class="grid">
+    <label>Who
+      <select name="cooked_by_user_id">
+        {% for member in members %}
+        <option value="{{ member.id }}" {{ "selected" if member.id == entry.cooked_by_user_id }}>{{ member.display_name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>When
+      <input type="datetime-local" name="cooked_at" value="{{ entry.cooked_at | datetime_local_value(tz) }}" required>
+    </label>
+  </div>
+  <div class="grid">
+    <label>Servings <input type="number" name="servings" min="1" max="100" value="{{ entry.servings or '' }}"></label>
+    <label>Notes <input name="notes" maxlength="2000" value="{{ entry.notes or '' }}"></label>
+  </div>
+  <button type="submit">Save</button>
+  <button type="button" class="secondary outline"
+          hx-get="/recipes/{{ entry.recipe_id }}/activity" hx-target="#recipe-activity" hx-swap="outerHTML">Cancel</button>
+</form>

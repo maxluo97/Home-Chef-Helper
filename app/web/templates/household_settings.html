@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}{{ active_household.name }} settings · Chef Helper{% endblock %}
+{% block content %}
+<h2>{{ active_household.name }}</h2>
+{% if message %}<p class="notice {{ message_kind or 'ok' }}">{{ message }}</p>{% endif %}
+
+{# --- Mealie connection --- #}
+<article>
+  <header>Mealie</header>
+  {% if active_household.mealie_token_encrypted %}
+  <p>
+    ✓ Connected as <strong>{{ active_household.mealie_username }}</strong>
+    (Mealie household “{{ active_household.mealie_household_name }}”)
+    <br><span class="meta">since {{ active_household.mealie_connected_at | local_datetime(tz) }}</span>
+  </p>
+  <details>
+    <summary>Replace or disconnect</summary>
+    {% include "_mealie_token_form.html" %}
+    <form method="post" action="/household/mealie/disconnect">
+      <button type="submit" class="secondary outline">Disconnect Mealie</button>
+    </form>
+  </details>
+  {% else %}
+  <p>Not connected. Paste an API token from Mealie
+     (<em>your profile → API Tokens → Generate</em>) to bring in your recipes.</p>
+  {% include "_mealie_token_form.html" %}
+  {% endif %}
+</article>
+
+{# --- Join code --- #}
+<article>
+  <header>Invite people</header>
+  <p>Share this code; others enter it under <em>Households → Join</em>.</p>
+  <p class="join-code">{{ active_household.join_code }}</p>
+  <form method="post" action="/household/join-code">
+    <button type="submit" class="secondary outline">Make a new code</button>
+    <small>The old code stops working.</small>
+  </form>
+</article>
+
+{# --- Members --- #}
+<article>
+  <header>Members</header>
+  <ul>
+    {% for member in members %}
+    <li>{{ member.display_name }} <span class="meta">@{{ member.username }}</span></li>
+    {% endfor %}
+  </ul>
+</article>
+{% endblock %}
